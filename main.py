@@ -40,17 +40,22 @@ class ChatServer:
                     text = message
 
                     try:
-                        aes = AES.new(key, AES.MODE_ECB)
+                        # 使用CBC模式代替ECB模式，并生成随机的初始化，CBC一定要
+                        iv = Random.new().read(AES.block_size)
+                        aes = AES.new(key, AES.MODE_CBC, iv)
                         base64_decrypted = base64.decodebytes(text.encode(encoding='utf-8'))
-                        decrypted_text = str(aes.decrypt(base64_decrypted), encoding='utf-8').replace('%s', '')
+                        # 解密后去除填充，确保消息格式没有其他问题，unpad函数
+                        decrypted_text = unpad(aes.decrypt(base64_decrypted), AES.block_size).decode('utf-8')
                         print(f"[{username}] ({websocket.remote_address[0]}) # {decrypted_text}")
                         await asyncio.wait([ws.send(decrypted_text) for ws in self.cs.keys()])
                     except ValueError as e:
+                        # 写到一半，不知道怎么写下去了 《T_T》l
                         print(f"[{username}] ({websocket.remote_address[0]}) # Invalid message format: {e}")
                         await websocket.send('Invalid message format')
                     except Exception as e:
                         print(f"[{username}] ({websocket.remote_address[0]}) # Error decrypting message: {e}")
                         await websocket.send('Error decrypting message')
+                    # 这里只是修改了加密模式，至于js那边的通信还得需要修改 ps：闲着无聊，写一下，顺便测试一下GitHub的Copilot能不能进行自动纠错
 
         except ValueError as e:
             print("Invalid path or user info")
